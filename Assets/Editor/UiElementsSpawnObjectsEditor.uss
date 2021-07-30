@@ -1,0 +1,26 @@
+.row {
+    display:flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.prefab-button{
+    height: 125px;
+    width: 125px;
+    margin 5px;
+    justify-content:flex-end;
+}
+
+.prefab-button_icon{
+    pointer-events:none;
+}
+
+.unity-button{
+    background-image: url("/Assets/Images")
+}
+
+.Label {
+    font-size: 20px;
+    -unity-font-style: bold;
+    color: rgb(68, 138, 255);
+}

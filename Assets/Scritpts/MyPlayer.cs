@@ -4,8 +4,11 @@ using UnityEngine;
 
 public class MyPlayer : MonoBehaviour
 {
+
     [Header("Component Variables")]
     private Rigidbody2D _rb;
+    private Animator _anim;
+
     /// <summary>
     /// ////
     /// </summary>
@@ -19,21 +22,35 @@ public class MyPlayer : MonoBehaviour
 
     [Header("Movement Variables")]
     //[SerializeField] just to have them on inspector
-    [SerializeField] private float _movementAcc;
-    [SerializeField] private float _maxMoveSpd;
-    [SerializeField] private float _groundDesAcc;
+    [SerializeField] private float _movementAcc = 70f;
+    [SerializeField] private float _maxMoveSpd = 12f;
+    [SerializeField] private float _groundDesAcc =7f;
     private float _hDirection;
     private float _vDirection;
+    private bool _facingRight = true;
     private bool _changeDir => (_rb.velocity.x > 0f && _hDirection < 0f) || (_rb.velocity.x < 0f && _hDirection > 0f);
     private bool _canMove => !_spiderHands;
+
+
+
+    [Header("Dash!! Variables!!")]
+    [SerializeField] private float _dashSpeed = 15f;
+    [SerializeField] private float _dashlength = .3f;
+    [SerializeField] private float _dashBufferlength = .1f;
+    private float _dashBufferCounter;
+    private bool _isDashing;
+    private bool _hasDashed;
+    private bool _canDash => _dashBufferCounter >0f && !_hasDashed;
+
     /// <summary>
     /// ///////////
     /// </summary>
     [Header("Jump Variables")]
-    [SerializeField] private float _jumpForce = 13f;
-    [SerializeField] private float _airLinearDrag = 2f;
+    [SerializeField] private float _jumpForce = 12f;
+    [SerializeField] private float _airLinearDrag = 2.5f;
     [SerializeField] private float _fallMultiplier = 9.8f;
-    [SerializeField] private float _lowJumpFallMultiplier = 5f;
+    [SerializeField] private float _lowJumpFallMultiplier = 12f;
+    [SerializeField] private float _downMultiplier = 12f;
     [SerializeField] private float _hangTime = .1f;
     [SerializeField] private float _jumpBufferLength = .1f;
     [SerializeField] private int _extrajump = 1;
@@ -68,6 +85,9 @@ public class MyPlayer : MonoBehaviour
     private void Start()
     {
         _rb = GetComponent<Rigidbody2D>();
+        _anim = GetComponent<Animator>();
+      
+
     }
     private void Update()
     {
@@ -77,6 +97,7 @@ public class MyPlayer : MonoBehaviour
         _vDirection = GetInput().y;
         if (Input.GetButtonDown("Jump"))
         {
+            print("Im jumping wiii");
             _jumpBufferCounter = _jumpBufferLength;
         }
         else
@@ -84,71 +105,75 @@ public class MyPlayer : MonoBehaviour
             _jumpBufferCounter -= Time.deltaTime; 
         }
 
-         
+        if(Input.GetButtonDown("Dash"))
+        {
+            print("Im dashing !");
+            _dashBufferCounter = _dashBufferlength;
+        }
+        else
+        {
+            _dashBufferCounter -= Time.deltaTime;
+        }
+        //Animations();
+
+
     }
 
     private void FixedUpdate()
     {   
         CheckCollisions();
-        if (_canMove) MoveCharacter();
-        else _rb.velocity = Vector2.Lerp(_rb.velocity, (new Vector2(_hDirection * _maxMoveSpd, _rb.velocity.y)), .5f * Time.deltaTime);       
-        if(_onGround)
+        if (_canDash) StartCoroutine(Dash(_hDirection, _vDirection));
+        if(!_isDashing)
         {
-           
-            ApplyingAirDesAcc();
-            _extraJumpValue = _extrajump;
-            _hangTimeCounter = _hangTime;
-
-        }
-        else
-        {
-            ApplyingAirDesAcc();
-            FallMultiplier();
-            _hangTimeCounter -= Time.fixedDeltaTime;
-            if (!_onWall || _rb.velocity.y < 0f || _wallRun) _isJumping = false;
-        }
-        if (_canJump)
-        {
-            if(_onWall && !_onGround)
+            if (_canMove) MoveCharacter();
+            else _rb.velocity = Vector2.Lerp(_rb.velocity, (new Vector2(_hDirection * _maxMoveSpd, _rb.velocity.y)), .5f * Time.deltaTime);
+            if (_onGround)
             {
-                if (!_wallRun && (_onRightWall && _hDirection > 0f || !_onRightWall && _hDirection < 0f))
-                {
-                    StartCoroutine(NeutralWallJump());
-                }
-                else
-                {
-                    WallJump();
-                } 
+
+                friccion();
+                _extraJumpValue = _extrajump;
+                _hangTimeCounter = _hangTime;
+                _hasDashed = false;
 
             }
-            
             else
             {
-                Jump(Vector2.up);
+                ApplyingAirDesAcc();
+                FallMultiplier();
+                _hangTimeCounter -= Time.fixedDeltaTime;
+                if (!_onWall || _rb.velocity.y < 0f || _wallRun) _isJumping = false;
+            }
+            if (_canJump)
+            {
+                if (_onWall && !_onGround)
+                {
+                    if (!_wallRun && (_onRightWall && _hDirection > 0f || !_onRightWall && _hDirection < 0f))
+                    {
+                        StartCoroutine(NeutralWallJump());
+                    }
+                    else
+                    {
+                        WallJump();
+                    }
+                    JustFlip();
+                }
+
+                else
+                {
+                    Jump(Vector2.up);
+                }
+            }
+
+            if (!_isJumping)
+            {
+                if (_spiderHands) Spiderman();
+                if (_Wallslide) WallSlide();
+                if (_wallRun) WallRun();
+                if (_onWall) StickToWallPlease();
             }
         }
-
-        if(!_isJumping)
-        {
-            if (_spiderHands) Spiderman();
-            if (_Wallslide) WallSlide();
-            if (_wallRun) WallRun();
-            if (_onWall) StickToWallPlease();
-        }        
     }
 
-    private void StickToWallPlease()
-    {
-        if(_onRightWall && _hDirection >=0f)
-        {
-            _rb.velocity = new Vector2(1f, _rb.velocity.y);
-        }
-        else if( !_onRightWall && _hDirection <=0f)
-        {
-            _rb.velocity = new Vector2(-1f, _rb.velocity.y);
-        }  
-    
-    }
     private static Vector2 GetInput()
     {
         return new Vector2(Input.GetAxisRaw("Horizontal"),Input.GetAxisRaw("Vertical"));
@@ -176,9 +201,13 @@ public class MyPlayer : MonoBehaviour
         }
     }
 
+    private void ApplyingAirDesAcc()
+    {
+        _rb.drag = _airLinearDrag;
+    }
     private void Jump(Vector2 direction)
     {
-        if (!_onGround && _onWall)
+        if (!_onGround && !_onWall)
             _extraJumpValue--;
 
         ApplyingAirDesAcc();
@@ -186,6 +215,7 @@ public class MyPlayer : MonoBehaviour
         _rb.AddForce(direction * _jumpForce, ForceMode2D.Impulse);
         _hangTimeCounter = 0f;
         _jumpBufferCounter = 0f;
+        _isJumping = true;
     }
 
     void WallJump()
@@ -205,10 +235,7 @@ public class MyPlayer : MonoBehaviour
 
 
 
-    private void ApplyingAirDesAcc()
-    {
-        _rb.drag = _airLinearDrag;
-    }
+ 
 
 
     private void Spiderman()
@@ -228,6 +255,67 @@ public class MyPlayer : MonoBehaviour
         _rb.velocity = new Vector2(_rb.velocity.x, _vDirection * _maxMoveSpd * _wallRunMod);
         
     }
+    
+    void JustFlip()
+    {
+        _facingRight = !_facingRight;
+        transform.Rotate(0f, 180f, 0f);
+    }
+
+    private void StickToWallPlease()
+    {
+        if (_onRightWall && _hDirection >= 0f)
+        {
+            _rb.velocity = new Vector2(1f, _rb.velocity.y);
+        }
+        else if (!_onRightWall && _hDirection <= 0f)
+        {
+            _rb.velocity = new Vector2(-1f, _rb.velocity.y);
+        }
+
+        //volteamos ala direccion correcta
+        if (_onRightWall && !_facingRight)
+        {
+            JustFlip();
+        }
+        else if(!_onRightWall && _facingRight)
+        {
+            JustFlip();
+        }
+
+    }
+
+    IEnumerator Dash(float x, float y)
+    {
+        float dashStartTime = Time.time;
+        _hasDashed = true;
+        _isDashing = true;
+        _isJumping = false;
+
+        _rb.velocity = Vector2.zero;
+        _rb.gravityScale = 0f;
+        _rb.drag = 0f;
+
+        //Direccion del dash
+        Vector2 dir;
+        if (x != 0f || y != 0f) dir = new Vector2(x, y);
+        else
+        {
+            if (_facingRight) dir = new Vector2(1f, 0f);
+            else dir = new Vector2(-1f, 0f);
+        }
+
+        while (Time.time <dashStartTime +_dashlength)
+        {
+            _rb.velocity = dir.normalized * _dashSpeed;
+            yield return null;
+        }
+
+        _isDashing = false;
+
+    }
+
+   
     private void CheckCollisions()
     {
         _onGround = Physics2D.Raycast(transform.position + _groundRaycastOffset, Vector2.down, _groundRaycastLength, _groundLayer) ||
@@ -241,20 +329,29 @@ public class MyPlayer : MonoBehaviour
         _onRightWall = Physics2D.Raycast(transform.position, Vector2.right, _wallRaycastLength, _wallLayer);
     }
 
-    private void FallMultiplier()
+    private void FallMultiplier()   
     {
-        if (_rb.velocity.y < 0)
+        if (_vDirection < 0f)
         {
-            _rb.gravityScale = _fallMultiplier;
-
+            _rb.gravityScale = _downMultiplier;
         }
-        else if (_rb.velocity.y > 0 && !Input.GetButton("Jump")) 
-        {
-            _rb.gravityScale = _lowJumpFallMultiplier;
-        }   
         else
         {
-            _rb.gravityScale = 1f;
+
+
+            if (_rb.velocity.y < 0)
+            {
+                _rb.gravityScale = _fallMultiplier;
+
+            }
+            else if (_rb.velocity.y > 0 && !Input.GetButton("Jump"))
+            {
+                _rb.gravityScale = _lowJumpFallMultiplier;
+            }
+            else
+            {
+                _rb.gravityScale = 1f;
+            }
         }
     }
 
