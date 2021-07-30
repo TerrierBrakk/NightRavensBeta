@@ -568,7 +568,7 @@ MonoBehaviour:
   _jumpBufferLength: 0.1
   _extrajump: 1
   _wallslideMod: 0.2
-  _wallRunMod: 0.85
+  _wallRunMod: 0.2
   _wallJumpVelHDelay: 0.2
   _groundRaycastLength: 1.02
   _groundRaycastOffset: {x: 0, y: 0, z: 0}
